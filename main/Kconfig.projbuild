@@ -1,0 +1,20 @@
+menu "Interface Forno"
+	menu "WiFi"
+		config WIFI_SSID
+            string "Nome da rede WiFi"
+            default "VETORIAL_11"
+            
+        config WIFI_PASSW
+            string "Senha da rede"
+            default "cleniR11"
+	endmenu
+	menu "MQTT"
+        config BROKER_URL
+            string "Url do broker"
+            default "broker.hivemq.com"
+        
+        config BROKER_PORT
+            int "Porta do Broker"
+            default 1883
+	endmenu
+endmenu
