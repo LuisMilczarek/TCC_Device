@@ -39,7 +39,7 @@ uint8_t connected = 0;
 uint16_t SP = 25;
 
 void mqttHandler(void *, esp_event_base_t, int32_t, void *);
-void dataCallback(char *, int, char *, int);
+void dataCallback(char *, int, char *, int, esp_mqtt_client_handle_t);
 void endTimeCallback(void *);
 static void log_error_if_nonzero(const char *, int);
 
@@ -91,6 +91,9 @@ void app_main(void)
                     state = READY;
                     esp_mqtt_client_publish(client, STATE_TOPIC,"READY", 0, 1, 0);
                 }
+                sprintf(msg,"%d",(int)temp);
+                esp_mqtt_client_publish(client, OUT_TOPIC, msg, 0, 1, 0);
+
                 ESP_LOGI(TAG,"Actual temp: %f", temp);
                 break;
             case READY:
@@ -100,7 +103,7 @@ void app_main(void)
                     ESP_LOGI(TAG,"Temp value: %.2fC",temp);
                     if(connected)
                     {
-                         sprintf(msg,"%.2f",temp);
+                         sprintf(msg,"%d",(int)temp);
                          esp_mqtt_client_publish(client, OUT_TOPIC, msg, 0, 1, 0);
                     }
                     if(temp < SP - DELTA)
@@ -162,7 +165,7 @@ void mqttHandler(void *handler_args, esp_event_base_t base, int32_t event_id, vo
         ESP_LOGI(TAG, "MQTT_EVENT_DATA");
         printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
         printf("DATA=%.*s\r\n", event->data_len, event->data);
-        dataCallback(event->topic, event->topic_len,event->data,event->data_len);
+        dataCallback(event->topic, event->topic_len,event->data,event->data_len, client);
         break;
             
     case MQTT_EVENT_ERROR:
@@ -189,30 +192,24 @@ static void log_error_if_nonzero(const char *message, int error_code)
     }
 }
 
-void dataCallback(char *topic, int topic_len, char *data, int data_len)
+void dataCallback(char *topic, int topic_len, char *data, int data_len, esp_mqtt_client_handle_t client)
 {
     
-    if(strncmp(topic, TIME_TOPIC, topic_len) == 0)
+    if(strncmp(topic, TIME_TOPIC, topic_len) == 0 && state != BAKING)
     {
-        if(state == READY)
-        {  
            state = BAKING;
+           ESP_LOGI(TAG, "New TIME: %d",atoi(data));
            esp_timer_start_once(bakingTimer, atoi(data) * 60000000);
-        }
+           esp_mqtt_client_publish(client, STATE_TOPIC, "BAKING", 0, 1, 0);
+
     }
     else if(strncmp(topic, IN_TOPIC, topic_len) == 0)
     {
         SP = atoi(data);
         ESP_LOGI(TAG, "New SP: %d",SP);
-    }
-    else if(strncmp(topic, STATE_TOPIC, topic_len) == 0)
-    {
-        ESP_LOGI(TAG, "Entrance topic len: %d, IN_TOPIC: %d", strlen(topic),strlen(IN_TOPIC));
-        if(strncmp(data, "WARM_UP", data_len) == 0 && state == IDLE)
-        {
-            state = WARM_UP;
-           gpio_set_level(relayPin,1);
-        }
+        state = WARM_UP;
+        gpio_set_level(relayPin,1);
+        esp_mqtt_client_publish(client, STATE_TOPIC, "WARM_UP", 0, 1, 0);
     }
 }
 
