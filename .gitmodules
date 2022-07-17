@@ -1,0 +1,3 @@
+[submodule "components/MAX6675"]
+	path = components/MAX6675
+	url = https://github.com/LuisMilczarek/MAX6675-IDF.git
